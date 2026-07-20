@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Env / secrets
+.env
+**/.env
+!**/.env.example
+
+# Prisma local SQLite (legacy local dev)
+server/prisma/*.db
+server/prisma/*.db-journal
+
+# Expo / Metro / native build outputs
+app/.expo/
+app/dist/
+app/web-build/
+app/android/
+app/ios/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Local tooling binaries
+cloudflared.exe

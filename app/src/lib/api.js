@@ -1,0 +1,134 @@
+import Constants from "expo-constants";
+import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const API_PORT = 4000;
+
+// On web, always talk to the backend on the SAME hostname the page is served
+// from (e.g. page at localhost:8090 -> API at localhost:4000). This avoids the
+// browser/OS-firewall blocking calls to a LAN IP like 192.168.x.x.
+function webApiUrl() {
+  if (Platform.OS === "web" && typeof window !== "undefined" && window.location?.hostname) {
+    return `${window.location.protocol}//${window.location.hostname}:${API_PORT}`;
+  }
+  return null;
+}
+
+// Default backend base URL. On native this comes from app.json; on a locked-down
+// network you can override it at runtime from the login screen (Advanced).
+export const DEFAULT_API_URL =
+  webApiUrl() || Constants.expoConfig?.extra?.apiUrl || `http://localhost:${API_PORT}`;
+
+const TOKEN_KEY = "h2o.token";
+const API_URL_KEY = "h2o.apiUrl";
+
+export async function getToken() {
+  return AsyncStorage.getItem(TOKEN_KEY);
+}
+export async function setToken(token) {
+  if (token) await AsyncStorage.setItem(TOKEN_KEY, token);
+  else await AsyncStorage.removeItem(TOKEN_KEY);
+}
+
+// Strips trailing slashes so we don't produce URLs like https://x//api/login.
+function normalizeUrl(url) {
+  return (url || "").trim().replace(/\/+$/, "");
+}
+
+export async function getBaseUrl() {
+  // On web, ignore any stored override and derive from the current page host so
+  // a stale LAN-IP value can never break login in the browser.
+  const web = webApiUrl();
+  if (web) return web;
+  const stored = await AsyncStorage.getItem(API_URL_KEY);
+  return normalizeUrl(stored) || DEFAULT_API_URL;
+}
+export async function setBaseUrl(url) {
+  const clean = normalizeUrl(url);
+  if (clean) await AsyncStorage.setItem(API_URL_KEY, clean);
+  else await AsyncStorage.removeItem(API_URL_KEY);
+}
+
+async function request(path, { method = "GET", body } = {}) {
+  const token = await getToken();
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}${path}`, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    // Surface the backend's message so the UI shows the real reason.
+    throw new Error(data.message || `Request failed (${res.status})`);
+  }
+  return data;
+}
+
+const qs = (params) => {
+  const s = new URLSearchParams(
+    Object.entries(params || {}).filter(([, v]) => v != null && v !== "")
+  ).toString();
+  return s ? `?${s}` : "";
+};
+
+export const api = {
+  login: (email, password) =>
+    request("/api/auth/login", { method: "POST", body: { email, password } }),
+  me: () => request("/api/me"),
+  registerPushToken: (token) =>
+    request("/api/push-token", { method: "POST", body: { token } }),
+  flats: () => request("/api/flats"),
+
+  maintenance: () => request("/api/maintenance"),
+  payBill: (id) => request(`/api/maintenance/${id}/pay`, { method: "POST" }),
+  createOrder: (id) =>
+    request(`/api/maintenance/${id}/create-order`, { method: "POST" }),
+  verifyPayment: (id, payload) =>
+    request(`/api/maintenance/${id}/verify`, { method: "POST", body: payload }),
+
+  visitors: () => request("/api/visitors"),
+  addVisitor: (payload) =>
+    request("/api/visitors", { method: "POST", body: payload }),
+  decideVisitor: (id, status) =>
+    request(`/api/visitors/${id}/decision`, { method: "POST", body: { status } }),
+
+  // Admin: accounts + flats
+  adminListUsers: (role) => request(`/api/admin/users${qs({ role })}`),
+  adminCreateUser: (payload) =>
+    request("/api/admin/users", { method: "POST", body: payload }),
+  adminUpdateUser: (id, payload) =>
+    request(`/api/admin/users/${id}`, { method: "PATCH", body: payload }),
+  adminDeleteUser: (id) =>
+    request(`/api/admin/users/${id}`, { method: "DELETE" }),
+  adminListFlats: () => request("/api/admin/flats"),
+  adminCreateFlat: (payload) =>
+    request("/api/admin/flats", { method: "POST", body: payload }),
+
+  // Admin: society bank account (Razorpay Route linked account)
+  adminGetBankAccount: () => request("/api/admin/bank-account"),
+  adminSaveBankAccount: (payload) =>
+    request("/api/admin/bank-account", { method: "PUT", body: payload }),
+
+  // Resident-facing masked payee info
+  bankAccount: () => request("/api/bank-account"),
+
+  // Admin: finance
+  adminFinance: () => request("/api/admin/finance"),
+  adminGenerateBills: (payload) =>
+    request("/api/admin/bills", { method: "POST", body: payload }),
+  adminRemindUnpaid: () =>
+    request("/api/admin/reminders", { method: "POST" }),
+  adminListExpenses: () => request("/api/admin/expenses"),
+  adminAddExpense: (payload) =>
+    request("/api/admin/expenses", { method: "POST", body: payload }),
+
+  // AI (phase 5)
+  aiAssistant: (question) =>
+    request("/api/ai/assistant", { method: "POST", body: { question } }),
+  aiVoiceVisitor: (payload) =>
+    request("/api/ai/voice-visitor", { method: "POST", body: payload }),
+};

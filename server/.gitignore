@@ -1,0 +1,12 @@
+node_modules/
+data.json
+.env
+
+# SQLite database files
+prisma/dev.db
+prisma/dev.db-journal
+*.db
+*.db-journal
+
+# Local runtime logs
+*.log

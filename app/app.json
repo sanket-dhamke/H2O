@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "H2O",
+    "slug": "h2o",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#0B6E8F",
+    "icon": "./assets/icon.png",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.h2o.society"
+    },
+    "android": {
+      "package": "com.h2o.society",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B6E8F"
+      },
+      "permissions": [
+        "NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "H2O uses the camera so the gate guard can take a photo of the visitor."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "H2O uses the microphone so the gate guard can dictate visitor details."
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#0B6E8F"
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "http://192.168.1.9:4000"
+    }
+  }
+}

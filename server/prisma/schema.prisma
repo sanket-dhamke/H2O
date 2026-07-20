@@ -1,0 +1,104 @@
+// H2O society app database schema.
+// PostgreSQL (Supabase in production). Roles/statuses are kept as plain strings
+// for portability rather than DB enums.
+// Allowed values:
+//   User.role      : "resident" | "guard" | "admin"
+//   Bill.status    : "pending"  | "paid"
+//   Visitor.status : "pending"  | "approved" | "rejected" | "leave_at_gate"
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Flat {
+  id        String    @id @default(uuid())
+  flatNo    String    @unique
+  block     String?
+  ownerName String?
+  residents User[]
+  bills     Bill[]
+  visitors  Visitor[]
+  createdAt DateTime  @default(now())
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  phone         String?
+  passwordHash  String
+  role          String
+  flat          Flat?     @relation(fields: [flatId], references: [id])
+  flatId        String?
+  expoPushToken String?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  // Visitors this user (a guard) logged at the gate.
+  loggedVisitors Visitor[] @relation("GuardVisitors")
+}
+
+model Bill {
+  id         String    @id @default(uuid())
+  flat       Flat      @relation(fields: [flatId], references: [id], onDelete: Cascade)
+  flatId     String
+  period     String // e.g. "2026-07"
+  amount     Float
+  dueDate    String // e.g. "2026-07-10"
+  status     String    @default("pending")
+  paidAt     DateTime?
+  paymentRef String?
+  orderId    String?
+  createdAt  DateTime  @default(now())
+
+  @@index([flatId])
+}
+
+model Visitor {
+  id        String    @id @default(uuid())
+  flat      Flat      @relation(fields: [flatId], references: [id], onDelete: Cascade)
+  flatId    String
+  name      String
+  phone     String?
+  vehicleNo String?
+  purpose   String?
+  photoUrl  String?
+  guard     User?     @relation("GuardVisitors", fields: [guardId], references: [id])
+  guardId   String?
+  status    String    @default("pending")
+  decidedBy String?
+  createdAt DateTime  @default(now())
+  decidedAt DateTime?
+
+  @@index([flatId])
+}
+
+model Expense {
+  id        String   @id @default(uuid())
+  label     String
+  amount    Float
+  date      DateTime @default(now())
+  createdBy String?
+  createdAt DateTime @default(now())
+}
+
+// The single society bank account that maintenance collections are routed to.
+// razorpayAccountId is a Razorpay Route "Linked Account" id (acc_XXXXXXXX);
+// when set, each maintenance order transfers its full amount to that account.
+model SocietyAccount {
+  id                String   @id @default(uuid())
+  accountHolderName String
+  bankName          String?
+  accountNumber     String?
+  ifsc              String?
+  upiId             String?
+  razorpayAccountId String?
+  active            Boolean  @default(true)
+  updatedBy         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
